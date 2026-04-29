@@ -3,29 +3,21 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from app.schemas.ticket_schemas import TicketCreate, TicketResponse, TicketUpdate
 from app.services import TicketService, CategoryService
 from app.repositories import TicketRepository, CategoryRepository
+from app.core.dependencies import get_ticket_repository, get_category_repository
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
-
-
-def get_ticket_service() -> TicketService:
-    """Provider que cria o serviço com o repositório injetado"""
-    repository = TicketRepository()
-    return TicketService(repository=repository)
-
-
-def get_category_service() -> CategoryService:
-    """Provider para validar categoria"""
-    repository = CategoryRepository()
-    return CategoryService(repository=repository)
 
 
 @router.post("/", response_model=TicketResponse, status_code=status.HTTP_201_CREATED)
 def create_ticket(
     ticket: TicketCreate,
-    ticket_service: TicketService = Depends(get_ticket_service),
-    category_service: CategoryService = Depends(get_category_service)
+    ticket_repo: TicketRepository = Depends(get_ticket_repository),
+    category_repo: CategoryRepository = Depends(get_category_repository)
 ):
     """Cria um novo ticket (valida se category_id existe)"""
+    ticket_service = TicketService(repository=ticket_repo)
+    category_service = CategoryService(repository=category_repo)
+    
     # Validar se a categoria existe
     category = category_service.get_category_by_id(ticket.category_id)
     if not category:
@@ -38,15 +30,34 @@ def create_ticket(
 
 
 @router.get("/", response_model=list[TicketResponse])
-def list_tickets(ticket_service: TicketService = Depends(get_ticket_service)):
-    """Lista todos os tickets"""
-    return ticket_service.get_all_tickets()
+def list_tickets(
+    ticket_repo: TicketRepository = Depends(get_ticket_repository),
+    status: str = None,
+    priority: str = None,
+    category_id: int = None,
+    skip: int = 0,
+    limit: int = 100
+):
+    """Lista tickets com filtros e paginação"""
+    service = TicketService(repository=ticket_repo)
+
+    # Criar dicionário de filtros (apenas os não-None)
+    filters = {}
+    if status is not None:
+        filters["status"] = status
+    if priority is not None:
+        filters["priority"] = priority
+    if category_id is not None:
+        filters["category_id"] = category_id
+
+    return service.list_tickets(filters, skip, limit)
 
 
 @router.get("/{ticket_id}", response_model=TicketResponse)
-def get_ticket(ticket_id: int, ticket_service: TicketService = Depends(get_ticket_service)):
+def get_ticket(ticket_id: int, ticket_repo: TicketRepository = Depends(get_ticket_repository)):
     """Obtém um ticket pelo ID"""
-    ticket = ticket_service.get_ticket_by_id(ticket_id)
+    service = TicketService(repository=ticket_repo)
+    ticket = service.get_ticket_by_id(ticket_id)
     if not ticket:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -59,9 +70,11 @@ def get_ticket(ticket_id: int, ticket_service: TicketService = Depends(get_ticke
 def update_ticket(
     ticket_id: int,
     ticket: TicketUpdate,
-    ticket_service: TicketService = Depends(get_ticket_service)
+    ticket_repo: TicketRepository = Depends(get_ticket_repository)
 ):
     """Atualiza um ticket (parcial)"""
+    service = TicketService(repository=ticket_repo)
+    
     # Filtrar apenas campos que foram enviados (não None)
     update_data = ticket.model_dump(exclude_unset=True)
     
@@ -71,7 +84,7 @@ def update_ticket(
             detail="Nenhum dado fornecido para atualização"
         )
     
-    updated = ticket_service.update_ticket(ticket_id, update_data)
+    updated = service.update_ticket(ticket_id, update_data)
     if not updated:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

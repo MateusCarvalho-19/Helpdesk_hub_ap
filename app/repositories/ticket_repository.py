@@ -1,3 +1,5 @@
+import datetime
+
 from pydantic import BaseModel
 
 
@@ -7,7 +9,13 @@ class TicketRepository(BaseModel):
         self._next_id = 1
 
     def create(self, ticket_data: dict) -> dict:
-        ticket = {"id": self._next_id, **ticket_data}
+        now = datetime.datetime.now()
+        ticket = {
+            "id": self._next_id,
+            **ticket_data,
+            "created_at": now,
+            "updated_at": now
+        }
         self._tickets.append(ticket)
         self._next_id += 1
         return ticket
@@ -25,6 +33,7 @@ class TicketRepository(BaseModel):
         ticket = self.get_by_id(id)
         if ticket:
             ticket.update(data)
+            ticket["updated_at"] = datetime.datetime.now()
             return ticket
         return None
 
@@ -34,5 +43,3 @@ class TicketRepository(BaseModel):
             self._tickets.remove(ticket)
             return True
         return False
-        self._next_id += 1
-        return tickets

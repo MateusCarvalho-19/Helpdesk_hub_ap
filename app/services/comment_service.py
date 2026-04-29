@@ -8,8 +8,15 @@ class CommentService():
         self.ticket_repository = ticket_repository
 
     def create_comment(self, ticket_id, comment_data: dict) -> dict:
-        self.ticket_repo.get_by_id(ticket_id)
+        ticket = self.ticket_repository.get_by_id(ticket_id)
+        if not ticket:
+            raise ValueError("Ticket not found")
         
+        comment_data = {**comment_data, "ticket_id": ticket_id}
+        
+        new_comments = self.comment_repository.create(comment_data)
+        return new_comments
 
+    
 
 

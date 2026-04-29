@@ -20,3 +20,18 @@ class TicketService(BaseModel):
 
     def delete_ticket(self, id: int) -> bool:
         return self.repository.delete(id)
+
+    def list_tickets(self, filters: dict, skip: int = 0, limit: int = 100) -> list:
+        """Lista tickets com filtros, paginação (skip) e limite (limit)"""
+        tickets = self.repository.get_all()
+
+        # Aplicar filtros
+        if "status" in filters and filters["status"]:
+            tickets = [t for t in tickets if t.get("status") == filters["status"]]
+        if "priority" in filters and filters["priority"]:
+            tickets = [t for t in tickets if t.get("priority") == filters["priority"]]
+        if "category_id" in filters and filters["category_id"]:
+            tickets = [t for t in tickets if t.get("category_id") == filters["category_id"]]
+
+        # Aplicar paginação
+        return tickets[skip:skip + limit]
